@@ -18,7 +18,7 @@ import type {
 } from "./auth.interface";
 
 const registerPatient = async (payload: IRegisterPatientPayload) => {
-	const { name, password } = payload;
+	const { name, password, patient: patientData } = payload;
 	const email = payload.email.trim().toLowerCase();
 
 	const isUserExists = await prisma.user.findUnique({
@@ -40,7 +40,11 @@ const registerPatient = async (payload: IRegisterPatientPayload) => {
 			status: UserStatus.ACTIVE,
 			emailVerified: false,
 			patient: {
-				create: { name, email },
+				create: {
+					name,
+					email,
+					contactNumber: patientData?.contactNumber || "",
+				},
 			},
 		},
 		omit: { password: true },
@@ -58,13 +62,13 @@ const registerPatient = async (payload: IRegisterPatientPayload) => {
 	const accessToken = jwtUtils.createToken(
 		jwtPayload,
 		config.jwt_access_secret,
-		config.jwt_access_expires_in as SignOptions,
+		config.jwt_access_expires_in as SignOptions["expiresIn"],
 	);
 
 	const refreshToken = jwtUtils.createToken(
 		jwtPayload,
 		config.jwt_refresh_secret,
-		config.jwt_refresh_expires_in as SignOptions,
+		config.jwt_refresh_expires_in as SignOptions["expiresIn"],
 	);
 
 	return {
