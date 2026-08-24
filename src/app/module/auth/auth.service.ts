@@ -1,6 +1,9 @@
 import bcrypt from "bcryptjs";
-import { OAuth2Client, type TokenPayload } from "google-auth-library";
+import crypto from "crypto";
+import ejs from "ejs";
+import type { TokenPayload } from "google-auth-library";
 import type { JwtPayload, SignOptions } from "jsonwebtoken";
+import path from "path";
 import {
 	AuthProvider,
 	Role,
@@ -8,13 +11,17 @@ import {
 } from "../../../generated/prisma/enums";
 import config from "../../config";
 import { googleClient } from "../../lib/googleAuth";
+import { transporter } from "../../lib/modemailer";
 import { prisma } from "../../lib/prisma";
+import { redisClient } from "../../lib/redis";
 import { jwtUtils } from "../../utils/jwt";
 import type {
+	IForgetPasswordPayload,
 	IGoogleLoginPayload,
 	ILoginUserPayload,
 	IRegisterPatientPayload,
 	IRequestUser,
+	IResetPasswordPayload,
 } from "./auth.interface";
 
 const registerPatient = async (payload: IRegisterPatientPayload) => {
@@ -29,7 +36,10 @@ const registerPatient = async (payload: IRegisterPatientPayload) => {
 		throw new Error("User with this email already exists");
 	}
 
-	const hashedPassword = await bcrypt.hash(password, 8);
+	const hashedPassword = await bcrypt.hash(
+		password,
+		Number(config.bcrypt_salt_rounds),
+	);
 
 	const createdUser = await prisma.user.create({
 		data: {
@@ -193,13 +203,13 @@ const refreshToken = async (token: string) => {
 	const accessToken = jwtUtils.createToken(
 		jwtPayload,
 		config.jwt_access_secret,
-		config.jwt_access_expires_in as SignOptions,
+		config.jwt_access_expires_in as SignOptions["expiresIn"],
 	);
 
 	const refreshToken = jwtUtils.createToken(
 		jwtPayload,
 		config.jwt_refresh_secret,
-		config.jwt_refresh_expires_in as SignOptions,
+		config.jwt_refresh_expires_in as SignOptions["expiresIn"],
 	);
 
 	return {
@@ -330,10 +340,148 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 	};
 };
 
+const forgetPassword = async (payload: IForgetPasswordPayload) => {
+	const { email } = payload;
+
+	const isUserExist = await prisma.user.findUnique({
+		where: {
+			email,
+		},
+	});
+
+	if (!isUserExist) {
+		throw new Error("User not Found");
+	}
+
+	if (isUserExist.status === UserStatus.BLOCKED) {
+		throw new Error("User is blocked");
+	}
+
+	if (!isUserExist.emailVerified) {
+		throw new Error("User email is not verified");
+	}
+
+	if (isUserExist.isDeleted || isUserExist.status === UserStatus.DELETED) {
+		throw new Error("User is Deleted");
+	}
+
+	if (isUserExist.googleId && isUserExist.authProvider === "GOOGLE") {
+		throw new Error("User has an account with google");
+	}
+
+	const otp = crypto.randomInt(100000, 1000000).toString();
+
+	const key = `forget-password-otp:${isUserExist.email}`;
+
+	await redisClient.set(key, otp, {
+		expiration: {
+			type: "EX",
+			value: 5 * 60,
+		},
+	});
+
+	const template_path = path.join(
+		process.cwd(),
+		"src/app/templates/forget-password.ejs",
+	);
+
+	const html = await ejs.renderFile(template_path, {
+		otp,
+	});
+
+	await transporter.sendMail({
+		from: config.email_sender,
+		to: isUserExist.email,
+		subject: "Forgot password",
+		// html: `<h1>Your OTP: ${otp}</h1>`,
+		html,
+	});
+};
+
+const resetPassword = async (payload: IResetPasswordPayload) => {
+	const { email, otp, newPassword } = payload;
+
+	const isUserExist = await prisma.user.findUnique({
+		where: {
+			email,
+		},
+	});
+
+	if (!isUserExist) {
+		throw new Error("User not Found");
+	}
+
+	if (isUserExist.status === UserStatus.BLOCKED) {
+		throw new Error("User is blocked");
+	}
+
+	if (!isUserExist.emailVerified) {
+		throw new Error("User email is not verified");
+	}
+
+	if (isUserExist.isDeleted || isUserExist.status === UserStatus.DELETED) {
+		throw new Error("User is Deleted");
+	}
+
+	if (isUserExist.googleId && isUserExist.authProvider === "GOOGLE") {
+		throw new Error("User has an account with google");
+	}
+
+	const key = `forget-password-otp:${isUserExist.email}`;
+	const redisOtp = await redisClient.get(key);
+
+	if (!redisOtp) {
+		throw new Error("Invalid OTP!");
+	}
+	if (redisOtp !== otp) {
+		throw new Error("ORP doesn`t match!");
+	}
+
+	const hashedPassword = await bcrypt.hash(
+		newPassword,
+		Number(config.bcrypt_salt_rounds),
+	);
+
+	await prisma.user.update({
+		where: {
+			email: isUserExist.email,
+		},
+		data: {
+			password: hashedPassword,
+		},
+	});
+
+	await redisClient.del([key]);
+
+	const template_path = path.join(
+		process.cwd(),
+		"src/app/templates/reset-password-success.ejs",
+	);
+
+	const html = await ejs.renderFile(template_path);
+
+	await transporter.sendMail({
+		from: config.email_sender,
+		to: isUserExist.email,
+		subject: "Forgot password",
+		// html: `<h1>Your OTP: ${otp}</h1>`,
+		html,
+	});
+
+	await transporter.sendMail({
+		from: config.email_sender,
+		to: isUserExist.email,
+		subject: "Password Changed",
+		html,
+	});
+};
+
 export const AuthService = {
 	registerPatient,
 	loginUser,
 	getMe,
 	refreshToken,
 	googleLogin,
+	forgetPassword,
+	resetPassword,
 };

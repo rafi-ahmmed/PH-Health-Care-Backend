@@ -1,12 +1,15 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import crypto from "crypto";
 import express, {
 	type Application,
+	type NextFunction,
 	type Request,
 	type Response,
 } from "express";
 import httpStatus from "http-status";
 import config from "./app/config";
+import { redisClient } from "./app/lib/redis";
 import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 import { notFound } from "./app/middleware/notFound";
 import { AuthRoutes } from "./app/module/auth/auth.route";
@@ -28,6 +31,29 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use("/api/v1/auth", AuthRoutes);
+
+app.get("/test", async (req: Request, res: Response, next: NextFunction) => {
+	try {
+		// 100000 < 999999 < 1000000
+		const otp = crypto.randomInt(100000, 1000000);
+
+		// await redisClient.set("forgetPasswordOTP:patient1@gmail.com", "123456", {
+		// 	expiration: {
+		// 		type: "EX",
+		// 		value: 60 * 5,
+		// 	},
+		// });
+
+		res.status(200).json({
+			success: true,
+			message: "Welcome to ph healthcare",
+			data: otp,
+		});
+	} catch (error) {
+		console.log(error);
+		next(error);
+	}
+});
 
 // Basic route
 app.get("/", async (req: Request, res: Response) => {
