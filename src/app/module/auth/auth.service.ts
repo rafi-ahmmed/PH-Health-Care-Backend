@@ -22,6 +22,7 @@ import type {
 	IRegisterPatientPayload,
 	IRequestUser,
 	IResetPasswordPayload,
+	IVerifyEmailPayload,
 } from "./auth.interface";
 
 const registerPatient = async (payload: IRegisterPatientPayload) => {
@@ -41,14 +42,112 @@ const registerPatient = async (payload: IRegisterPatientPayload) => {
 		Number(config.bcrypt_salt_rounds),
 	);
 
+	const otpValue = crypto.randomInt(100000, 1000000).toString();
+	const redisUserDataPayload = {
+		name,
+		email,
+		password: hashedPassword,
+		patient: patientData,
+	};
+
+	const otpKey = `user-registration-otp:${email}`;
+	const patientRegistrationKey = `patient-registration-data:${email}`;
+
+	await redisClient.set(otpKey, otpValue, {
+		expiration: {
+			type: "EX",
+			value: 5 * 60,
+		},
+	});
+
+	await redisClient.set(
+		patientRegistrationKey,
+		JSON.stringify(redisUserDataPayload),
+		{
+			expiration: {
+				type: "EX",
+				value: 5 * 60,
+			},
+		},
+	);
+
+	const template_path = path.join(
+		process.cwd(),
+		"src/app/templates/verify-email.ejs",
+	);
+
+	const html = await ejs.renderFile(template_path, {
+		otp: otpValue,
+	});
+
+	await transporter.sendMail({
+		from: config.email_sender,
+		to: email,
+		subject: "Email verification",
+		// html: `<h1>Your OTP: ${otp}</h1>`,
+		html,
+	});
+};
+
+const verifyPatientEmail = async (payload: IVerifyEmailPayload) => {
+	const email = payload.email.trim().toLowerCase();
+	const otp = payload.otp;
+
+	const isUserExists = await prisma.user.findUnique({
+		where: { email },
+	});
+
+	if (isUserExists?.status === UserStatus.BLOCKED) {
+		throw new Error("User is blocked");
+	}
+
+	if (isUserExists?.emailVerified) {
+		throw new Error("Email already Verified");
+	}
+
+	if (isUserExists?.isDeleted || isUserExists?.status === UserStatus.DELETED) {
+		throw new Error("User is Deleted");
+	}
+
+	const otpKey = `user-registration-otp:${email}`;
+	const redisOtp = await redisClient.get(otpKey);
+	const patientRegistrationKey = `patient-registration-data:${email}`;
+
+	console.log("otp", otp);
+	console.log("redis otp", redisOtp);
+
+	if (!redisOtp) {
+		throw new Error("Invalid OTP!");
+	}
+	if (redisOtp !== otp) {
+		throw new Error("Otp doesn`t match!");
+	}
+
+	const redisUserData = await redisClient.get(patientRegistrationKey);
+
+	if (!redisUserData) {
+		throw new Error("User doesn't exiest");
+	}
+
+	await redisClient.del(otpKey);
+
+	const patientPayload: IRegisterPatientPayload = JSON.parse(redisUserData);
+
+	const {
+		name,
+		email: userEmail,
+		password,
+		patient: patientData,
+	} = patientPayload;
+
 	const createdUser = await prisma.user.create({
 		data: {
 			name,
-			email,
-			password: hashedPassword,
+			email: userEmail,
+			password,
 			role: Role.PATIENT,
 			status: UserStatus.ACTIVE,
-			emailVerified: false,
+			emailVerified: true,
 			patient: {
 				create: {
 					name,
@@ -60,6 +159,8 @@ const registerPatient = async (payload: IRegisterPatientPayload) => {
 		omit: { password: true },
 		include: { patient: true },
 	});
+
+	await redisClient.del(patientRegistrationKey);
 
 	const { patient, ...user } = createdUser;
 	const jwtPayload = {
@@ -80,6 +181,25 @@ const registerPatient = async (payload: IRegisterPatientPayload) => {
 		config.jwt_refresh_secret,
 		config.jwt_refresh_expires_in as SignOptions["expiresIn"],
 	);
+
+	// Send welcome email to the user
+	const template_path = path.join(
+		process.cwd(),
+		"src/app/templates/welcome-email.ejs",
+	);
+
+	const html = await ejs.renderFile(template_path, {
+		name: user.name,
+		email: user.email,
+	});
+
+	await transporter.sendMail({
+		from: config.email_sender,
+		to: email,
+		subject: "Welcome to PH Healthcare",
+
+		html,
+	});
 
 	return {
 		user,
@@ -301,6 +421,24 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 					patient: true,
 				},
 			});
+
+			const template_path = path.join(
+				process.cwd(),
+				"src/app/templates/welcome-email.ejs",
+			);
+
+			const html = await ejs.renderFile(template_path, {
+				name: user.name,
+				email: user.email,
+			});
+
+			await transporter.sendMail({
+				from: config.email_sender,
+				to: user.email,
+				subject: "Welcome to PH Healthcare",
+				// html: `<h1>Your OTP: ${otp}</h1>`,
+				html,
+			});
 		}
 	}
 
@@ -478,6 +616,7 @@ const resetPassword = async (payload: IResetPasswordPayload) => {
 
 export const AuthService = {
 	registerPatient,
+	verifyPatientEmail,
 	loginUser,
 	getMe,
 	refreshToken,
