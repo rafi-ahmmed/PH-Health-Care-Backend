@@ -345,7 +345,6 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 			idToken: payload.idToken,
 			audience: config.google_client_id,
 		});
-		console.log(ticket);
 
 		googleTokenPayload = ticket.getPayload();
 	} catch (error) {
