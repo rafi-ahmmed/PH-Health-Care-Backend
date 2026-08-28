@@ -32,4 +32,11 @@ export default {
 	cloudinary_cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
 	cloudinary_api_key: process.env.CLOUDINARY_API_KEY!,
 	cloudinary_api_secret: process.env.CLOUDINARY_API_SECRET!,
+
+	bkash_sandbox_url: process.env.BKASH_SANDBOX_URL!,
+	bkash_sandbox_username: process.env.BKASH_SANDBOX_USERNAME!,
+	bkash_sandbox_password: process.env.BKASH_SANDBOX_PASSWORD!,
+	bkash_sandbox_app_key: process.env.BKASH_SANDBOX_APP_KEY!,
+	bkash_sandbox_app_secret: process.env.BKASH_SANDBOX_APP_SECRET!,
+	bkash_callback_url: process.env.BKASH_CALLBACK_URL,
 };
