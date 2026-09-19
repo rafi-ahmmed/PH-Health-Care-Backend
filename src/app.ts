@@ -8,7 +8,7 @@ import express, {
 } from "express";
 import httpStatus from "http-status";
 import config from "./app/config";
-import { bkashIdToken } from "./app/lib/bkash";
+import getBkashIdToken from "./app/lib/bkash";
 import { redisClient } from "./app/lib/redis";
 import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 import { notFound } from "./app/middleware/notFound";
@@ -38,7 +38,7 @@ app.use("/api/v1/appointment", appointmentRoutes);
 
 app.get("/test", async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const result = await bkashIdToken();
+		const result = await getBkashIdToken();
 		console.log(result);
 		res.status(200).json({
 			success: true,

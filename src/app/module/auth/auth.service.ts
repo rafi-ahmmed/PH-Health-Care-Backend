@@ -371,7 +371,10 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 	});
 
 	let user = ifPatientExistWithGoogleAuth;
+
+	// * If user not exist with google auth but exist with credentials
 	if (!ifPatientExistWithGoogleAuth) {
+		// * Check is user exist with credentials
 		const ifPatientExistWithCredentials = await prisma.user.findUnique({
 			where: {
 				email: googleTokenPayload.email,
@@ -400,7 +403,7 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 				},
 			});
 		} else {
-			// Google register
+			//* if not exists with credentials so create user with  Google
 			user = await prisma.user.create({
 				data: {
 					name: googleTokenPayload.name,
@@ -421,6 +424,7 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
 				},
 			});
 
+			// * send welcome email to user
 			const template_path = path.join(
 				process.cwd(),
 				"src/app/templates/welcome-email.ejs",

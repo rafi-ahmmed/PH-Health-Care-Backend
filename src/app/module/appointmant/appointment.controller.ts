@@ -7,8 +7,9 @@ import { appointmentServices } from "./appointment.service";
 const bookAppointment = catchAsync(
 	async (req: Request, res: Response, next: NextFunction) => {
 		const payload = req.body;
-		console.log(payload);
-		const result = await appointmentServices.bookAppointment();
+		const user = req.user!;
+
+		const result = await appointmentServices.bookAppointment(payload, user);
 
 		sendResponse(res, {
 			statusCode: httpStatus.OK,
@@ -28,6 +29,37 @@ const bookAppointmentCallback = catchAsync(
 	},
 );
 
+const payForAppointment = catchAsync(
+	async (req: Request, res: Response, next: NextFunction) => {
+		const payload = req.body;
+		const user = req.user!;
+
+		const result = await appointmentServices.payForAppointment(payload, user);
+
+		sendResponse(res, {
+			statusCode: httpStatus.OK,
+			success: true,
+			message: "Payment URL created",
+			data: result,
+		});
+	},
+);
+
+const cancelAppointment = catchAsync(
+	async (req: Request, res: Response, next: NextFunction) => {
+		const payload = req.body;
+
+		const result = await appointmentServices.cancelAppointment(payload);
+
+		sendResponse(res, {
+			statusCode: httpStatus.OK,
+			success: true,
+			message: "Appointment cancelled successfully.",
+			data: result,
+		});
+	},
+);
+
 // const testController = catchAsync(
 // 	async (req: Request, res: Response, next: NextFunction) => {
 // 		const payload = req.body;
@@ -44,4 +76,6 @@ const bookAppointmentCallback = catchAsync(
 export const appointmentControllers = {
 	bookAppointment,
 	bookAppointmentCallback,
+	payForAppointment,
+	cancelAppointment
 };
