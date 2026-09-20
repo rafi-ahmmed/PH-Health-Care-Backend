@@ -20,6 +20,14 @@ export default {
 	super_admin_email: process.env.SUPER_ADMIN_EMAIL,
 	super_admin_password: process.env.SUPER_ADMIN_PASSWORD,
 
+	admin_name: process.env.ADMIN_NAME,
+	admin_email: process.env.ADMIN_EMAIL,
+	admin_password: process.env.ADMIN_PASSWORD,
+
+	doctor_name: process.env.DOCTOR_NAME,
+	doctor_email: process.env.DOCTOR_EMAIL,
+	doctor_password: process.env.DOCTOR_PASSWORD,
+
 	redis_username: process.env.REDIS_USERNAME!,
 	redis_password: process.env.REDIS_PASSWORD!,
 	redis_host: process.env.REDIS_HOST!,

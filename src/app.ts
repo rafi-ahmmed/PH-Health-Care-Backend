@@ -14,6 +14,7 @@ import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 import { notFound } from "./app/middleware/notFound";
 import { appointmentRoutes } from "./app/module/appointmant/appointment.route";
 import { AuthRoutes } from "./app/module/auth/auth.route";
+import { doctorRoutes } from "./app/module/doctor/doctor.route";
 import { UserRoutes } from "./app/module/user/user.route";
 
 const app: Application = express();
@@ -35,6 +36,7 @@ app.use(cookieParser());
 app.use("/api/v1/auth", AuthRoutes);
 app.use("/api/v1/user", UserRoutes);
 app.use("/api/v1/appointment", appointmentRoutes);
+app.use("/api/v1/doctor", doctorRoutes);
 
 app.get("/test", async (req: Request, res: Response, next: NextFunction) => {
 	try {
