@@ -36,6 +36,54 @@ const applyForDoctor = catchAsync(
 	},
 );
 
+const verifyDoctorEmail = catchAsync(
+	async (req: Request, res: Response, next: NextFunction) => {
+		const payload = req.body;
+
+		const result = await doctorServices.verifyDoctorEmail(payload);
+
+		sendResponse(res, {
+			statusCode: httpStatus.OK,
+			success: true,
+			message: "Email verified successfully.",
+			data: result,
+		});
+	},
+);
+
+const approveDoctor = catchAsync(
+	async (req: Request, res: Response, next: NextFunction) => {
+		const payload = req.body;
+		const reviewer = req.user;
+
+		if (!reviewer) {
+			throw new Error("Reviewer information is missing.");
+		}
+
+		const result = await doctorServices.approveDoctor(payload, reviewer);
+
+		sendResponse(res, {
+			statusCode: httpStatus.OK,
+			success: true,
+			message: "Doctor approved successfully.",
+			data: result,
+		});
+	},
+);
+
+const getAllDoctors = catchAsync(
+	async (req: Request, res: Response, next: NextFunction) => {
+		const doctors = await doctorServices.getAllDoctors();
+
+		sendResponse(res, {
+			statusCode: httpStatus.OK,
+			success: true,
+			message: "Doctors retrieved successfully.",
+			data: doctors,
+		});
+	},
+);
+
 // const testController = catchAsync(
 // 	async (req: Request, res: Response, next: NextFunction) => {
 // 		const payload = req.body;
@@ -51,4 +99,7 @@ const applyForDoctor = catchAsync(
 
 export const doctorControllers = {
 	applyForDoctor,
+	verifyDoctorEmail,
+	approveDoctor,
+	getAllDoctors,
 };
