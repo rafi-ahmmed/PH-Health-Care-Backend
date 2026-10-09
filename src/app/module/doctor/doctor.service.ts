@@ -7,7 +7,9 @@ import {
 	DoctorVerificationStatus,
 	Role,
 } from "../../../generated/prisma/enums";
+import type { DoctorWhereInput } from "../../../generated/prisma/models";
 import config from "../../config";
+import type { IQuery } from "../../interfaces";
 import cloudinary from "../../lib/cloudinary";
 import { transporter } from "../../lib/modemailer";
 import { prisma } from "../../lib/prisma";
@@ -259,8 +261,42 @@ const approveDoctor = async (
 	return updatedDoctor;
 };
 
-const getAllDoctors = async () => {
-	
+const getAllDoctors = async (query: IQuery) => {
+	const { searchTerm, page, limit, sortBy, sortOrder } = query;
+
+	const andCondition: DoctorWhereInput[] = [];
+
+	// * Searching
+	if (searchTerm) {
+		andCondition.push({
+			OR: [
+				{
+					name: {
+						contains: searchTerm,
+						mode: "insensitive",
+					},
+				},
+				{
+					email: {
+						contains: searchTerm,
+						mode: "insensitive",
+					},
+				},
+				{
+					specialization: {
+						contains: searchTerm,
+						mode: "insensitive",
+					},
+				},
+				{
+					licenseNumber: {
+						contains: searchTerm,
+						mode: "insensitive",
+					},
+				},
+			],
+		});
+	}
 };
 // const verifyDoctorEmail = async (payload: any) => {};
 

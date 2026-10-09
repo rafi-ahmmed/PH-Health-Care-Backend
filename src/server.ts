@@ -1,3 +1,4 @@
+import cron from "node-cron";
 import app from "./app";
 import config from "./app/config";
 import { transporter } from "./app/lib/modemailer";
@@ -20,6 +21,10 @@ const main = async () => {
 		await seedSuperAdmin();
 		await seedAdmin();
 		await seedDoctor();
+
+		cron.schedule("* * * * *", () => {
+			console.log("Running a task every minute");
+		});
 
 		app.listen(PORT, () => {
 			console.log(`Server is running on port ${PORT}`);
